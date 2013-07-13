@@ -61,12 +61,22 @@ Fixpoint iter (C : Type) (c0 : C) (cs : C -> C) (n : nat) : C :=
     | 0 => c0
     | S n' => cs (iter C c0 cs n')
   end.
+Definition mynat_rec' (C : Type) : C -> (nat -> C -> C) -> nat -> nat * C := fun c0 cs n =>
+  iter (nat * C) (0, c0) (fun p => match p with (x1, x2) => (S x1, cs x1 x2) end) n.
 Definition mynat_rec (C : Type) : C -> (nat -> C -> C) -> nat -> C :=
-  fun c0 cs n => snd (iter (nat * C) (0, c0) (fun p => (S (fst p), cs (fst p) (snd p))) n).
-(* not necessary *)
-Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rec (fun _ => C) c0 cs n.
-  (* proof requires stronger induction hypothesis... *)
-  admit.
+  fun c0 cs n => snd (mynat_rec' C c0 cs n).
+
+Hint Transparent mynat_rec' mynat_rec.
+
+Ltac rewriter := repeat (match goal with
+                             | [ H : ?P |- _ ] => rewrite H
+                         end).
+Ltac crush := simpl in *; rewriter; try trivial.
+
+Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rect (fun _ => C) c0 cs n.
+  intros.
+  assert (mynat_rec' C c0 cs n = (n, nat_rect (fun _ => C) c0 cs n)) by (induction n; unfold mynat_rec' in *; crush).
+  unfold mynat_rec; crush.
 Qed.
 Eval compute in mynat_rec (list nat) nil (@cons nat) 2.
 Eval compute in nat_rect (fun _ => list nat) nil (@cons nat) 2.
