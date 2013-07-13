@@ -10,13 +10,14 @@ Ltac simplHyp :=
   match goal with
       | [ H : _ * _ |- _ ] => destruct H (* half-assed, can be generalized for any inversion *)
   end.
-Ltac crush := simpl in *; repeat simplHyp; try trivial.
+(* do f_ap first, since simpl may undo the opportunity *)
+Ltac crush := try f_ap; simpl in *; repeat simplHyp; try trivial.
 
 Definition refl {A : Type} (x : A) : x = x := 1%path.
 
 (* If you want to use concat, you will usually need to use eauto, since the
 path concat passes through is UNSPECIFIED. *)
-Hint Resolve ap11 ap01 concat.
+Hint Resolve ap11 ap01.
 Hint Constructors prod.
 
 (* Exercise 1.1 *)
@@ -158,35 +159,72 @@ Section ex_1_6.
   Definition mymkprod (a : A) (b : B) : myprod A B := Bool_rect (Bool_rect (fun _ => Type) A B) a b.
   Definition myprod_uppt (x : myprod A B) : (mymkprod (mypr1 x) (mypr2 x) = x).
     apply path_forall. (* function extensionality! *)
-    unfold pointwise_paths. (* destruct x0; reflexivity. *)
-    apply Bool_rect; reflexivity.
+    unfold pointwise_paths; apply Bool_rect; reflexivity.
   Defined.
-  
+
   Definition myprod_ind (C : myprod A B -> Type)
                         (g : forall (x : A) (y : B), C (mymkprod x y)) (x : myprod A B) : C x :=
     transport C (myprod_uppt x) (g (mypr1 x) (mypr2 x)).
+
+  Lemma myprod_uppt_canonical : forall a b, myprod_uppt (mymkprod a b) = 1%path.
+    intros; unfold myprod_uppt.
+    transitivity (path_forall (mymkprod (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b))) _ (fun _ => 1%path)).
+      crush; by_extensionality x; destruct x; crush.
+      apply path_forall_1. (* for some reason auto doesn't pick this up, maybe because of the axiom *)
+  Qed.
+  
+  Hint Resolve transport_1 myprod_uppt_canonical.
   (* same as exercise 1.3! *)
   Goal forall C g a b, myprod_ind C g (mymkprod a b) = g a b.
-    intros.
-    unfold myprod_ind.
-    (* Prove the transport is trivial for canonical elements *)
-    assert (myprod_uppt (mymkprod a b) = 1%path) as X.
-      unfold myprod_uppt, mymkprod, mypr1, mypr2, Bool_rect.
-      (* needs to be written with implicit arguments, or Coq infers the wrong ones. *)
-      assert ((fun b0 : Bool =>
-         if b0 as b1
-          return
-            (@paths (if b1 then A else B)
-               (if b1 as b2 return (if b2 then A else B) then a else b)
-               (if b1 as b2 return (if b2 then A else B) then a else b))
-         then @idpath A a
-         else @idpath B b) = fun _ => 1%path) as Y.
-        (* why doesn't the by_extensionality tactic work here? *)
-        apply H. unfold pointwise_paths. destruct x; reflexivity.
-      (* I hear HoTTheorists don't like rewrite *)
-      rewrite Y.
-      apply path_forall_1.
-    rewrite X.
-    apply transport_1.
+    intros; unfold myprod_ind.
+    transitivity (transport C 1%path (g (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b)))); crush; auto.
   Qed.
 End ex_1_6.
+
+(* Exercise 1.7 *)
+
+Definition ind {A : Type} : forall (C : forall (x y : A), x = y -> Type), (forall (x : A), C x x 1%path) -> forall (x y : A) (p : x = y), C x y p.
+  path_induction; crush. (* the easy direction *)
+Qed.
+
+(* these are the textbook definitions that uses universes: notice they have exactly the same structure! *)
+
+Definition ind'1 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p.
+  pose (D := fun x y p => forall (C : forall (z : A) (p : x = z), Type), C x 1%path -> C y p).
+  assert (d : forall x : A, D x x 1%path) by exact (fun x C (c : C x 1%path) => c). (* cannot pose this, for some reason *)
+  apply (ind D d); auto.
+Qed.
+Definition ind'2 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p :=
+  ind (fun x y p => forall (C : forall (z : A), x = z -> Type), C x 1%path -> C y p)
+      (fun x C d => d)
+      a x p C c.
+
+Set Printing Universes.
+Print ind'1.
+Print ind'2.
+Unset Printing Universes.
+
+Check @transport.
+Check @contr_basedpaths.
+Print Contr.
+
+Definition ind' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p.
+   refine (ind (fun _ _ _ => C x p) (fun _ => _) a x p).
+   (* Contributed by jgross: use 'change' in order to convert the expressions into
+      something we can do a normal transport over.  Fortunately, there is an
+      obvious choice. *)
+   change ((fun xp => C xp.1 xp.2) (a; 1%path)) in c.
+   change ((fun xp => C xp.1 xp.2) (x; p)).
+   Check (@contr _ (contr_basedpaths a) (x; p)).
+   apply (transport _ (@contr _ (contr_basedpaths a) (x; p))); crush.
+Qed.
+Set Printing Universes.
+Print ind'.
+Unset Printing Universes.
+
+Check (fun (A : Type) (x a : A) (p : a = x) => contr (x; p)).
+Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p :=
+  ind (fun _ _ _ => C x p)
+      (fun _ => transport (fun z : exists x, a = x => C z.1 z.2)
+                          (contr (x; p)) c)
+      a x p.
