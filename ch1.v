@@ -1,9 +1,11 @@
 Require Import HoTT.
 
 (* Use sparingly! *)
-Ltac rewriter := repeat (match goal with
-                             | [ H : ?P |- _ ] => rewrite H
-                         end).
+Ltac rewriter := 
+  autorewrite with core;
+  repeat (match goal with
+            | [ H : ?P |- _ ] => rewrite H
+          end).
 Ltac simplHyp :=
   match goal with
       | [ H : _ * _ |- _ ] => destruct H (* half-assed, can be generalized for any inversion *)
@@ -89,18 +91,19 @@ Lemma mynat_rec_eq : forall {C c0 cs n}, mynat_rec' C c0 cs n = (n, nat_rect (fu
   (* Using uncurried path_prod keeps our induction hypothesis strong *)
   intros; apply path_prod_uncurried; induction n; crush; auto.
 Qed.
+Hint Resolve mynat_rec_eq.
+Hint Rewrite @mynat_rec_eq : core.
 
 (* Here is a traditional Coq proof using rewrite *)
 Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rect (fun _ => C) c0 cs n.
-  intros. unfold mynat_rec. rewrite mynat_rec_eq. crush.
+  intros; unfold mynat_rec.
+  rewriter; crush.
 Qed.
 
-(* Here is a proof which utilizes explicit path concatenation *)
+(* Here is a proof which utilizes path concatenation *)
 Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rect (fun _ => C) c0 cs n.
-  intros.
-  assert (H : snd (n, nat_rect (fun _ : nat => C) c0 cs n) = nat_rect (fun _ : nat => C) c0 cs n)
-         by reflexivity.
-  apply (concat (ap snd mynat_rec_eq) H).
+  intros; unfold mynat_rec.
+  transitivity (snd (n, nat_rect (fun _ : nat => C) c0 cs n)); [ f_ap | reflexivity ].
 Qed.
 
 Eval compute in mynat_rec (list nat) nil (@cons nat) 2.
