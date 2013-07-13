@@ -1,5 +1,22 @@
 Require Import HoTT.
 
+(* Use sparingly! *)
+Ltac rewriter := repeat (match goal with
+                             | [ H : ?P |- _ ] => rewrite H
+                         end).
+Ltac simplHyp :=
+  match goal with
+      | [ H : _ * _ |- _ ] => destruct H (* half-assed, can be generalized for any inversion *)
+  end.
+Ltac crush := simpl in *; repeat simplHyp; try trivial.
+
+Definition refl {A : Type} (x : A) : x = x := 1%path.
+
+(* If you want to use concat, you will usually need to use eauto, since the
+path concat passes through is UNSPECIFIED. *)
+Hint Resolve ap11 ap01 concat.
+Hint Constructors prod.
+
 (* Exercise 1.1 *)
 Definition mycompose {A B C : Type} (g : B -> C) (f : A -> B) : A -> C :=
   fun x => g (f x).
@@ -34,8 +51,6 @@ End ex_1_2_sig.
 
 (* Exercise 1.3 *)
 
-Definition refl {A : Type} (x : A) : x = x := 1%path.
-
 Section ex_1_3_prod.
   Variable A B : Type.
   Definition uppt : forall (x : A * B), ((fst x, snd x) = x) :=
@@ -61,23 +76,33 @@ Fixpoint iter (C : Type) (c0 : C) (cs : C -> C) (n : nat) : C :=
     | 0 => c0
     | S n' => cs (iter C c0 cs n')
   end.
+
 Definition mynat_rec' (C : Type) : C -> (nat -> C -> C) -> nat -> nat * C := fun c0 cs n =>
-  iter (nat * C) (0, c0) (fun p => match p with (x1, x2) => (S x1, cs x1 x2) end) n.
+  iter (nat * C) (0, c0) (fun p => (S (fst p), cs (fst p) (snd p))) n.
 Definition mynat_rec (C : Type) : C -> (nat -> C -> C) -> nat -> C :=
   fun c0 cs n => snd (mynat_rec' C c0 cs n).
 
-Hint Transparent mynat_rec' mynat_rec.
+Hint Unfold mynat_rec' mynat_rec.
 
-Ltac rewriter := repeat (match goal with
-                             | [ H : ?P |- _ ] => rewrite H
-                         end).
-Ltac crush := simpl in *; rewriter; try trivial.
+(* The trick to this proof is, of course, a strengthened induction hypothesis *)
+Lemma mynat_rec_eq : forall {C c0 cs n}, mynat_rec' C c0 cs n = (n, nat_rect (fun _ => C) c0 cs n).
+  (* Using uncurried path_prod keeps our induction hypothesis strong *)
+  intros; apply path_prod_uncurried; induction n; crush; auto.
+Qed.
 
+(* Here is a traditional Coq proof using rewrite *)
+Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rect (fun _ => C) c0 cs n.
+  intros. unfold mynat_rec. rewrite mynat_rec_eq. crush.
+Qed.
+
+(* Here is a proof which utilizes explicit path concatenation *)
 Goal forall C c0 cs n, mynat_rec C c0 cs n = nat_rect (fun _ => C) c0 cs n.
   intros.
-  assert (mynat_rec' C c0 cs n = (n, nat_rect (fun _ => C) c0 cs n)) by (induction n; unfold mynat_rec' in *; crush).
-  unfold mynat_rec; crush.
+  assert (H : snd (n, nat_rect (fun _ : nat => C) c0 cs n) = nat_rect (fun _ : nat => C) c0 cs n)
+         by reflexivity.
+  apply (concat (ap snd mynat_rec_eq) H).
 Qed.
+
 Eval compute in mynat_rec (list nat) nil (@cons nat) 2.
 Eval compute in nat_rect (fun _ => list nat) nil (@cons nat) 2.
 
@@ -88,6 +113,7 @@ Section ex_1_5.
   Variable A B : Type.
   Definition inl := existT (Bool_rect (fun _ => Type) A B) true.
   Definition inr := existT (Bool_rect (fun _ => Type) A B) false.
+  (* So many ways to write this function! And all of them with different representations... *)
   Definition f1 (C : Type) (l : A -> C) (r : B -> C) (x : Bool) : Bool_rect (fun _ => Type) A B x -> C :=
     match x return Bool_rect (fun _ => Type) A B x -> C (* annotation not necessary *) with
         | true => l
@@ -140,6 +166,7 @@ Section ex_1_6.
   Goal forall C g a b, myprod_ind C g (mymkprod a b) = g a b.
     intros.
     unfold myprod_ind.
+    (* Prove the transport is trivial for canonical elements *)
     assert (myprod_uppt (mymkprod a b) = 1%path) as X.
       unfold myprod_uppt, mymkprod, mypr1, mypr2, Bool_rect.
       (* needs to be written with implicit arguments, or Coq infers the wrong ones. *)
