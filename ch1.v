@@ -228,3 +228,57 @@ Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a
       (fun _ => transport (fun z : exists x, a = x => C z.1 z.2)
                           (contr (x; p)) c)
       a x p.
+
+(* Exercise 1.8 *)
+Check nat_rect.
+(*
+nat_rect
+     : forall P : nat -> Type,
+       P 0 -> (forall n : nat, P n -> P (S n)) -> forall n : nat, P n
+*)
+Definition add (a b : nat) := nat_rect (fun _ => nat) a (fun _ n => S n) b.
+Definition mult (a b : nat) := nat_rect (fun _ => nat) 0 (fun _ n => add n a) b.
+Definition exp (a b : nat) := nat_rect (fun _ => nat) 1 (fun _ n => mult n a) b.
+Eval compute in mult 3 4.
+Eval compute in exp 2 4.
+
+(* XXX blah blah proof *)
+
+(* Exercise 1.9 *)
+
+(* Exercise 1.10 *)
+
+(* Exercise 1.11 *)
+
+Goal forall A : Type, ~~~A -> ~A. auto. Qed.
+(* OK, not so interesting? *)
+Goal forall A : Type, ~~~A -> ~A.
+  unfold not.
+  intros A H X.
+  apply H.
+  intro G.
+  apply G.
+  apply X.
+Qed.
+
+(* Exercise 1.12 *)
+
+Definition ex1_12_i (A B : Type) : A -> (B -> A) := fun (a : A) => fun (_ : B) => a.
+Definition ex1_12_ii (A : Type) : A -> ~~A := fun (a : A) => fun (na : A -> Empty) => na a.
+Definition ex1_12_iii (A B : Type) : ~A \/ ~B -> ~(A /\ B) := fun (d : ~A \/ ~B) => fun (p : A /\ B) => match d with| Datatypes.inl na => na (fst p) | Datatypes.inr nb => nb (snd p) end.
+
+(* Exercise 1.13 *)
+
+(* Exercise 1.14 *)
+
+(* Exercise 1.15 *)
+
+Theorem ioi' {A : Type} (C : A -> Type) (x y : A) (p : x = y) : C x -> C y.
+  path_induction; auto.
+Qed.
+
+(* OK, this is cheating a little because the problem asked for a proof from plain 'path induction'.
+Notice that the normal path induction proof is pretty similar to the based path induction proof. *)
+
+Definition ioi {A : Type} (C : A -> Type) (x y : A) (p : x = y) : C x -> C y :=
+  fun c => ind (fun _ _ _ => C y) (fun _ => transport C p c) x y p.
