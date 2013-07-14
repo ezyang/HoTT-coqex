@@ -10,8 +10,8 @@ Ltac simplHyp :=
   match goal with
       | [ H : _ * _ |- _ ] => destruct H (* half-assed, can be generalized for any inversion *)
   end.
-(* do f_ap first, since simpl may undo the opportunity *)
-Ltac crush := try f_ap; simpl in *; repeat simplHyp; try trivial.
+
+Ltac crush := simpl in *; repeat simplHyp; try trivial; try solve [f_ap].
 
 Definition refl {A : Type} (x : A) : x = x := 1%path.
 
@@ -169,7 +169,7 @@ Section ex_1_6.
   Lemma myprod_uppt_canonical : forall a b, myprod_uppt (mymkprod a b) = 1%path.
     intros; unfold myprod_uppt.
     transitivity (path_forall (mymkprod (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b))) _ (fun _ => 1%path)).
-      crush; by_extensionality x; destruct x; crush.
+      f_ap; crush; by_extensionality x; destruct x; crush.
       apply path_forall_1. (* for some reason auto doesn't pick this up, maybe because of the axiom *)
   Qed.
   
@@ -177,7 +177,7 @@ Section ex_1_6.
   (* same as exercise 1.3! *)
   Goal forall C g a b, myprod_ind C g (mymkprod a b) = g a b.
     intros; unfold myprod_ind.
-    transitivity (transport C 1%path (g (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b)))); crush; auto.
+    transitivity (transport C 1%path (g (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b)))); try f_ap; crush; auto.
   Qed.
 End ex_1_6.
 
@@ -231,18 +231,48 @@ Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a
 
 (* Exercise 1.8 *)
 Check nat_rect.
-(*
-nat_rect
-     : forall P : nat -> Type,
-       P 0 -> (forall n : nat, P n -> P (S n)) -> forall n : nat, P n
-*)
-Definition add (a b : nat) := nat_rect (fun _ => nat) a (fun _ n => S n) b.
-Definition mult (a b : nat) := nat_rect (fun _ => nat) 0 (fun _ n => add n a) b.
-Definition exp (a b : nat) := nat_rect (fun _ => nat) 1 (fun _ n => mult n a) b.
+(* You can write these to ways, and it's traditional to recurse on the first argument *)
+Definition add (a b : nat) := nat_rect (fun _ => nat) b (fun _ n => S n) a.
+Definition mult (a b : nat) := nat_rect (fun _ => nat) 0 (fun _ n => add n b) a.
+Definition exp (a b : nat) := nat_rect (fun _ => nat) 1 (fun _ n => mult n b) a.
 Eval compute in mult 3 4.
 Eval compute in exp 2 4.
 
-(* XXX blah blah proof *)
+(* You need congruence of naturals to do some of these proofs, I think. *)
+
+Lemma nat_plus_assoc : forall a b c, add (add a b) c = add a (add b c).
+  intros; induction a; crush.
+Qed.
+Lemma nat_plus_r_zero : forall a, add a 0 = a. induction a; crush. Qed.
+Lemma nat_plus_l_zero : forall a, add 0 a = a. reflexivity. Qed.
+Hint Immediate nat_plus_r_zero nat_plus_l_zero.
+Hint Rewrite nat_plus_r_zero nat_plus_l_zero.
+Lemma nat_plus_r_succ : forall a b, add a (S b) = S (add a b). intros; induction a; crush. Qed.
+Hint Resolve nat_plus_r_succ.
+Lemma nat_plus_commutative : forall a b, add a b = add b a.
+  induction a; induction b; crush; f_ap; auto. transitivity (S (add a b)); auto.
+Qed. (* oh the lack of congruence! *)
+
+Lemma nat_mult_l_succ : forall a b, mult (S a) b = add b (mult a b).
+  intros; induction a; crush. apply inverse; auto. apply nat_plus_commutative.
+Qed.
+Lemma nat_mult_distr : forall a b c, mult (add a b) c = add (mult a c) (mult b c).
+  intros; induction a; crush. destruct b; rewriter; crush.
+  (* WHERE IS MY CONGRUENCE!!! *)
+  transitivity (add c (add (mult a c) (add (mult b c) c))). apply nat_plus_commutative.
+  transitivity (add (add c (mult a c)) (add (mult b c) c)). rewrite <- nat_plus_assoc; trivial.
+  change ((fun p => add p (add (mult b c) c)) (add c (mult a c)) = (fun p => add p (add (mult b c) c)) (add (mult a c) c)).
+  f_ap. apply nat_plus_commutative.
+Qed.
+Hint Resolve nat_mult_distr.  
+Hint Resolve nat_mult_l_succ.
+Lemma nat_mult_assoc : forall a b c, mult (mult a b) c = mult a (mult b c).
+  intros; induction a; crush. rewrite <- IHa. auto.
+Qed.
+Lemma nat_mult_l_one : forall a, mult 1 a = a. reflexivity. Qed.
+Lemma nat_mult_r_one : forall a, mult a 1 = a. induction a; crush. rewrite IHa; crush. rewrite nat_plus_commutative; crush.
+
+(* XXX blah blah proof. I gave up because doing these without congruence is annoying *)
 
 (* Exercise 1.9 *)
 
@@ -269,7 +299,16 @@ Definition ex1_12_iii (A B : Type) : ~A \/ ~B -> ~(A /\ B) := fun (d : ~A \/ ~B)
 
 (* Exercise 1.13 *)
 
+Goal forall P, ~~(P \/ ~P). unfold not; auto. Qed.
+
 (* Exercise 1.14 *)
+
+Definition f : forall (A : Type) (x : A) (p : x = x), p = idpath.
+  intros. path_induction.
+  try (exact idpath).
+Abort.
+
+(* The problem is both endpoints are fixed. There are nontrivial homotopies now! *)
 
 (* Exercise 1.15 *)
 
