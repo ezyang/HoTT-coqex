@@ -1,3 +1,4 @@
+
 Require Import HoTT.
 
 (* Exercise 2.1 *)
@@ -238,8 +239,6 @@ to this effect:
 https://github.com/HoTT/coq/issues/54
 https://github.com/HoTT/coq/issues/55
  *)
-(* Empty in Prop gives Coq fits, so redefine all of this here. *)
-Inductive Empty : Set :=.
 
 Definition path_sum {A B : Type} (z z' : A + B)
            (pq : match z, z' with
@@ -252,33 +251,33 @@ Definition path_sum {A B : Type} (z z' : A + B)
 Defined.
 
 (* Why are A B etc in Set and not Type?  Some sort of universe polymorphism bug... *)
-Theorem ex2_8 {A B A' B' : Set} (g : A -> A') (h : B -> B') (x y : A + B)
+Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B)
               (* Fortunately, this unifies properly *)
               (pq : match (x, y) with (inl x', inl y') => x' = y' | (inr x', inr y') => x' = y' | _ => Empty end) :
   let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
   ap f (path_sum x y pq) = path_sum (f x) (f y)
      (* Coq appears to require *ALL* of the annotations *)
-     ((match x as x return match (x, y) with
+     ((match x as x return match (x, y) return Type with
               (inl x', inl y') => x' = y'
             | (inr x', inr y') => x' = y'
             | _ => Empty
-          end -> match (f x, f y) with
+          end -> match (f x, f y) return Type with
                | (inl x', inl y') => x' = y'
                | (inr x', inr y') => x' = y'
                | _ => Empty end with
-           | inl x' => match y as y return match y with
+           | inl x' => match y as y return match y return Type with
                                                inl y' => x' = y'
                                              | _ => Empty
-                                           end -> match f y with
+                                           end -> match f y return Type with
                                                     | inl y' => g x' = y'
                                                     | _ => Empty end with
                          | inl y' => ap g
                          | inr y' => idmap
                        end
-           | inr x' => match y as y return match y with
+           | inr x' => match y as y return match y return Type with
                                                inr y' => x' = y'
                                              | _ => Empty
-                                           end -> match f y with
+                                           end -> match f y return Type with
                                                     | inr y' => h x' = y'
                                                     | _ => Empty end with
                          | inl y' => idmap
