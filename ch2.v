@@ -159,6 +159,8 @@ Defined.
 arguments to help Coq figure out the definitional equality.
 This lemmma is called ap_functor_prod in the standard library, and f is
 defined as functor_prod *)
+(* NB: defining f using fst/snd and not a match is fairly essential to
+   convincing Coq that things are definitionally equal in the way necessa *)
 Theorem theorem2_6_5 {A B A' B'} (g : A -> A') (h : B -> B') (x y : A * B) (p : fst x = fst y) (q : snd x = snd y) :
   let f z := (g (fst z), h (snd z)) in
     ap f (path_prod x y p q) = path_prod (f x) (f y) (ap g p) (ap h q).
@@ -226,13 +228,83 @@ Print ap_functor_sigma.
 (* coproducts aka sums *)
 Require Import Sum.
 
-(* An important question one has to answer here is, what is the equivalent
-of pair^= here? In the previous cases, we considered products, so we just
-always provided two equalities for each member of the pair; but here,
-we have a single equality which is *different* depending on what is inhabiting
-the pair. So our equality needs to be dependent now! *)
+(* We first reproduce the left-code and the right-code which is presented in
+Section 2.12 of the HoTT book, as well as the appropriate equivalences. *)
+
+Definition lcode {A B} (a0 : A) (x : A + B) :=
+  match x return Type with inl a => a0 = a | inr b => Empty end.
+Definition lencode {A B} {a0 : A} {x : A + B} (p : inl a0 = x) : lcode a0 x :=
+  transport (lcode a0) p idpath.
+Definition ldecode {A B} {a0 : A} {x : A + B} (c : lcode a0 x) : inl a0 = x.
+  destruct x. exact (ap inl c). destruct c.
+Defined.
+(* Done with tactics to automatically push the lambda abstraction inside the
+case on x and avoid writing all of the annotations for dependent match. *)
+Print ldecode.
+Lemma thm2_12_15_alpha {A B} {a0 : A} {x : A + B} (c : lcode a0 x) : (lencode (ldecode c)) = c.
+  destruct x; destruct c; reflexivity.
+Qed.
+Lemma thm2_12_15_beta {A B} {a0 : A} {x : A + B} (p : inl a0 = x) : (ldecode (lencode p)) = p.
+  path_induction; reflexivity.
+Qed.
+Theorem thm2_12_15 {A B} (a0 : A) (x : A + B) : IsEquiv (@lencode A B a0 x).
+  apply (isequiv_adjointify _ ldecode thm2_12_15_alpha thm2_12_15_beta ).
+Qed.
+
+Definition rcode {A B} (b0 : B) (x : A + B) := match x return Type with inl a => Empty | inr b => b0 = b end.
+Definition rencode {A B} {b0 : B} {x : A + B} (p : inr b0 = x) : rcode b0 x := transport (rcode b0) p idpath.
+Definition rdecode {A B} {b0 : B} {x : A + B} (c : rcode b0 x) : inr b0 = x.
+  destruct x. destruct c. f_ap.
+Defined.
+Lemma thm2_12_15'_alpha {A B} {b0 : B} {x : A + B} (c : rcode b0 x) : (rencode (rdecode c)) = c.
+  destruct x; destruct c. reflexivity.
+Qed.
+Lemma thm2_12_15'_beta {A B} {b0 : B} {x : A + B} (p : inr b0 = x) : (rdecode (rencode p)) = p.
+  path_induction. reflexivity.
+Qed.
+Theorem thm2_12_15' {A B} (b0 : B) (x : A + B) : IsEquiv (@rencode A B b0 x).
+  apply (isequiv_adjointify _ rdecode thm2_12_15'_alpha thm2_12_15'_beta ).
+Qed.
+
+(* The hardest part of this question is knowing how to /state/ the functoriality
+property at all.
+
+The first question one has to answer here is, what is the "equivalent"
+of pair^= here?  We have been instructed that pair^= is the "introduction rule"
+for equality on products; we are looking for a similar introduction rule for
+equality on sums.  But where it was simply enough to provide two equalities
+in the case of product (a negative type former), which equality we provide
+for a sum type depends on the tags of the values. (a positive type variable)
+So what this "equality" is, is in fact the *code* for equality over coproducts.
+
+Fortunately, the standard library already provides us the introduction rule
+for coproducts; and we can see what the *code* is (the lhs of the arrow): *)
 
 Check path_sum.
+
+(* In the HoTT library, the matches for the codes for coproducts are all explicitly
+written out.  However, it will simplify our work if we wrap them up in a definition,
+which we will call 'code'. I take advantage of the previous left-code and right-code
+definitions, but there's not any specific reason why they have to be used. *)
+
+Definition code {A B} (x0 : A + B) (x : A + B) :=
+  match x0 return Type with inl a0 => lcode a0 x | inr b0 => rcode b0 x end.
+Check @path_sum.
+Definition encode {A B} {x0 x : A + B} (p : x0 = x) : code x0 x.
+  destruct x0; [ exact (lencode p) | exact (rencode p) ].
+Defined.
+Definition decode {A B} {x0 x : A + B} (c : code x0 x) : x0 = x.
+  destruct x0; [ exact (ldecode c) | exact (rdecode c) ].
+Defined.
+Lemma encode_eq_alpha {A B} {x0 : A + B} {x : A + B} (c : code x0 x) : encode (decode c) = c.
+  destruct x0. apply thm2_12_15_alpha. apply thm2_12_15'_alpha.
+Defined.
+Lemma encode_eq_beta {A B} {x0 : A + B} {x : A + B} (p : x0 = x) : decode (encode p) = p.
+  path_induction; destruct x0; reflexivity.
+Qed.
+Theorem encode_eq {A B} (x0 : A + B) (x : A + B) : IsEquiv (@encode A B x0 x).
+  apply (isequiv_adjointify _ decode encode_eq_alpha encode_eq_beta ).
+Qed.
 
 (* This code gave hoqtop a lot of headaches. I've submitted two bugs
 to this effect:
@@ -251,7 +323,7 @@ Definition path_sum {A B : Type} (z z' : A + B)
 Defined.
 
 (* Why are A B etc in Set and not Type?  Some sort of universe polymorphism bug... *)
-Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B)
+Theorem ex2_8_raw {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B)
               (* Fortunately, this unifies properly *)
               (pq : match (x, y) with (inl x', inl y') => x' = y' | (inr x', inr y') => x' = y' | _ => Empty end) :
   let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
@@ -304,24 +376,55 @@ Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B)
   try solve [destruct pq]; path_induction; reflexivity.
 Qed.
 
-(* The presentation of sums in the book uses 'codes' to describe
-the match statements that occur in the theorem statements.  While the
-HoTT Coq library proper does not use codes for sums (only for the
-circle), it is instructive to redo the exercise with that formalism. *)
 
-Definition lcode {A B} {a0 : A} (x : A + B) := match x with inl a => a0 = a | inr b => Empty end.
-Definition lencode {A B} {a0 : A} (x : A + B) (p : inl a0 = x) : lcode x := transport lcode p idpath.
-Definition ldecode {A B} {a0 : A} (x : A + B) (c : @lcode A B a0 x) : inl a0 = x.
-  destruct x. f_ap. destruct c.
+
+(* applying the jgross trick to figure out the type... *)
+Lemma ex2_8_code_sub (A B A' B' : Type) (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) : Type.
+  refine (let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in _).
+  refine (ap f (path_sum x y pq) = path_sum (f x) (f y) _).
+  refine ((match x return code x y -> code (f x) (f y) with inl a0 => fun p =>  _ | inr b0 => fun p => _ end) pq).
+  refine (lencode (ap f (ldecode p))).
+  refine (rencode (ap f (rdecode p))).
 Defined.
 
-Definition rcode {A B} {b0 : B} (x : A + B) := match x with inl a => Empty | inr b => b0 = b end.
-Definition rencode {A B} {b0 : B} (x : A + B) (p : inr b0 = x) : rcode x := transport rcode p idpath.
-Definition rdecode {A B} {b0 : B} (x : A + B) (c : @rcode A B b0 x) : inr b0 = x.
-  destruct x. destruct c. f_ap.
-Defined.
+Theorem ex2_8_code {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
+  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
+  ap f (path_sum x y pq) = path_sum (f x) (f y)
+     ((match x return code x y -> code (f x) (f y) with
+          inl a0 => fun p => lencode (ap f (ldecode p))
+        | inr b0 => fun p => rencode (ap f (rdecode p))
+      end) pq).
+  destruct x; destruct y; unfold code, lcode, rcode in *;
+  try solve [destruct pq]; path_induction; reflexivity.
+Qed.
 
-(* XXX TODO *)
+Theorem ex2_8_code' {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
+  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
+  ap f (path_sum x y pq) = path_sum (f x) (f y) (encode (ap f (decode pq))).
+  destruct x; destruct y; unfold code, lcode, rcode, encode, decode in *;
+  try solve [destruct pq]; path_induction; reflexivity.
+Qed.
+
+Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
+  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
+  ap f (path_sum x y pq) = path_sum (f x) (f y)
+     ((match x return code x y -> code (f x) (f y) with
+          inl a0 => match y return lcode a0 y -> lcode (g a0) (f y) with
+                        inl a => ap g
+                      | inr b => fun p => p
+                    end
+        | inr b0 => match y return rcode b0 y -> rcode (h b0) (f y) with
+                        inl a => fun p => p
+                      | inr b => ap h
+                    end
+      end) pq).
+  destruct x; destruct y; unfold code, lcode, rcode in *;
+  try solve [destruct pq]; path_induction; reflexivity.
+Qed.
+
+(* "Application to Paths" from Harper notes https://www.dropbox.com/sh/jwtpx1rzal7um28/sOgTLhW1Zu/cancellation.pdf *)
+
+
 
 (* Exercise 2.9 *)
 
