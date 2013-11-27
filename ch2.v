@@ -465,44 +465,15 @@ Qed.
 
 (* Exercise 2.12 *)
 
-(* In the previous exercise we specialized (since h = .1 and k = .2.1), but for this exercise P is
-generic so it will be good to properly define pullback squares and the induced map in full
-generality. *)
+(* XXX fixup the previous exercise to use these definitions *)
 
 Print pullf.
 
-(* P -> A
-  4↓ 3  ↓1
-   B -> C
-     2    *)
-Definition induced_map `{Funext} {P A B C} (f : A -> C) (g : B -> C) (h : P -> A) (k : P -> B) (p : f o h = g o k) X (i : X -> P) : pullback (@compose X _ _ f) (@compose X _ _ g).
-  refine (h o i; (k o i; _)).
-  change (f o h o i = g o k o i).
-  refine (apD10 _ i).
-  exact (ap compose p).
-Defined.
-(* BTW, why couldn't pullf be defined in the same, graceful manner?  Well,
-the trouble is while the p here is explicitly provided, in the pullback case
-we got it out of the fact that pullbacks come with equality proofs.  We could
-have factored this out, so that the call-site of pullf was responsible
-for the extraction, but doing it the other way seemed more natural. It's a
-sleight of hand that reduces the arguments you need to pass around. (In
-a sense, we embedded the proof that it is a commutative square). *)
-
-Definition pullback_square `{Funext} {P A B C}
-                           (f : A -> C) (g : B -> C) (h : P -> A) (k : P -> B)
-                           (p : f o h = g o k) := 
-  forall X, IsEquiv (induced_map f g h k p X).
-
-(* The squares reproduced for your convenience:
-  A -> C -> E
-  ↓ p  ↓ q  ↓
-  B -> D -> F 
-    \--r--/  *)
+Definition square {A B C} P (f : A -> C) (g : B -> C) := pullback (@compose P _ _ f) (@compose P _ _ g).
 
 (* XXX I don't actually know if this is called whiskering *)
 Definition whisker
-          {A B C D E F} 
+          {A B C D E F}
           {ac : A -> C}
           {ab : A -> B}
           {cd : C -> D}
@@ -512,26 +483,54 @@ Definition whisker
           {df : D -> F}
           (p : cd o ac = bd o ab)
           (q : ef o ce = df o cd)
-  : ef o ce o ac = df o bd o ab.
+  : ef o (ce o ac) = df o (bd o ab).
+change (ef o ce o ac = df o bd o ab).
 transitivity (df o cd o ac); [f_ap|].
 change (df o (cd o ac) = df o (bd o ab)); f_ap.
 Defined.
 
+Definition square_up {A B C D E F} (f : C -> D) (g : B -> D) (h : E -> F) (k : D -> F) :
+  forall (P : square C h k) (Q : square A f g), f = P.2.1 -> square A h (k o g).
+intros P Q p.
+refine (P.1 o Q.1; (Q.2.1 ; _)). destruct P as [x' [y' z']]; simpl in *. destruct p.
+apply (whisker Q.2.2 z').
+Defined.
+Print square_up. (* The path induction is pretty horrible but we will try to refl it ASAP *)
+
+(* P -> A
+   ↓    ↓
+   B -> C *)
+Definition induced_map `{Funext} {P A B C} {f : A -> C} {g : B -> C} (z : square P f g)
+  : forall X, (X -> P) -> square X f g.
+  intros X i. 
+  refine (z.1 o i; (z.2.1 o i; _)).
+  change (f o z .1 o i = g o z.2.1 o i).
+  f_ap; exact z.2.2.
+  (* refine (apD10 (ap compose z.2.2) i). *)
+Defined.
+
+Definition pullback_square `{Funext} {P A B C} {f : A -> C} {g : B -> C} (z : square P f g) :=
+  forall X, IsEquiv (induced_map z X).
+
+(* The squares reproduced for your convenience:
+  A -> C -> E
+  ↓ p  ↓ q  ↓
+  B -> D -> F 
+    \--r--/  *)
+
+
 Definition induced_map_inv1
           `{Funext}
           {A B C D E F X}
-          (ac : A -> C)
-          (ab : A -> B)
-          (cd : C -> D)
-          (bd : B -> D)
-          (ce : C -> E)
-          (ef : E -> F)
-          (df : D -> F)
-          (p : cd o ac = bd o ab)
-          (q : ef o ce = df o cd)
-          (P : pullback_square ef df ce cd q)
-          (S : pullback_square cd bd ac ab p)
-          (z : pullback (@compose X _ _ ef) (@compose X _ _ (df o bd)))
+          {cd : C -> D}
+          {bd : B -> D}
+          {ef : E -> F}
+          {df : D -> F}
+          {square_ad : square A cd bd}
+          {square_cf : square C ef df}
+          (psquare_ad : pullback_square square_ad)
+          (psquare_cf : pullback_square square_cf)
+          (z : square X ef (df o bd))
           : X -> A.
 apply (S X).
 assert (xc : X -> C).
