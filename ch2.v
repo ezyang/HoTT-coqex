@@ -225,6 +225,9 @@ Print ap_functor_sigma.
 
 (* Exercise 2.8 *)
 
+(* Reader is also encouraged to check out commentary here, by Bob Harper:
+https://www.dropbox.com/sh/jwtpx1rzal7um28/sOgTLhW1Zu/cancellation.pdf  *)
+
 (* coproducts aka sums *)
 Require Import Sum.
 
@@ -266,30 +269,56 @@ Theorem thm2_12_15' {A B} (b0 : B) (x : A + B) : IsEquiv (@rencode A B b0 x).
   apply (isequiv_adjointify _ rdecode thm2_12_15'_alpha thm2_12_15'_beta ).
 Qed.
 
-(* The hardest part of this question is knowing how to /state/ the functoriality
+(* To a new reader, it probably will not be obvious what the codes are for.
+The hardest part of this question is knowing how to /state/ the functoriality
 property at all.
 
-The first question one has to answer here is, what is the "equivalent"
-of pair^= here?  We have been instructed that pair^= is the "introduction rule"
+Referring back to the question statement, we've been asked to state and
+prove a corresponding theorem to the functoriality of ap on products.
+We can go ahead and attempt to translate the theorem into the language
+of coproducts, but the first question one has to answer here is, what corresponds
+pair^= here?  We have been instructed that pair^= is the "introduction rule"
 for equality on products; we are looking for a similar introduction rule for
 equality on sums.  But where it was simply enough to provide two equalities
 in the case of product (a negative type former), which equality we provide
 for a sum type depends on the tags of the values. (a positive type variable)
 So what this "equality" is, is in fact the *code* for equality over coproducts.
 
-Fortunately, the standard library already provides us the introduction rule
-for coproducts; and we can see what the *code* is (the lhs of the arrow): *)
+While we may not have a good idea what the type of this introduction rule
+is, we might know what it is named.  Fortunately, the standard library
+already provides us the introduction rule for coproducts; and we can see what
+the *code* is (the lhs of the arrow): *)
 
 Check path_sum.
 
 (* In the HoTT library, the matches for the codes for coproducts are all explicitly
 written out.  However, it will simplify our work if we wrap them up in a definition,
 which we will call 'code'. I take advantage of the previous left-code and right-code
-definitions, but there's not any specific reason why they have to be used. *)
+definitions, but there's not any specific reason why they have to be used.  When
+Harper gives a presentation of this material, he simply states that these are
+defined by double case-match. *)
 
 Definition code {A B} (x0 : A + B) (x : A + B) :=
-  match x0 return Type with inl a0 => lcode a0 x | inr b0 => rcode b0 x end.
-Check @path_sum.
+  match x0 with
+      inl a0 => lcode a0 x
+    | inr b0 => rcode b0 x
+  end.
+
+(* For completeness, though, here is the expanded version: *)
+Definition code' {A B} (x0 : A + B) (x : A + B) :=
+  match x0 with
+      inl a0 => match x with
+                    inl a => a0 = a
+                  | inr b => Empty
+                end
+    | inr b0 => match x with
+                    inl a => Empty
+                  | inr b => b0 = b
+                end
+  end.
+(* Sanity check that these are definitionally equal: *)
+Lemma code_code' {A B} (x0 : A + B) (x : A + B) : code x0 x = code' x0 x. reflexivity. Qed.
+
 Definition encode {A B} {x0 x : A + B} (p : x0 = x) : code x0 x.
   destruct x0; [ exact (lencode p) | exact (rencode p) ].
 Defined.
@@ -306,104 +335,8 @@ Theorem encode_eq {A B} (x0 : A + B) (x : A + B) : IsEquiv (@encode A B x0 x).
   apply (isequiv_adjointify _ decode encode_eq_alpha encode_eq_beta ).
 Qed.
 
-(* This code gave hoqtop a lot of headaches. I've submitted two bugs
-to this effect:
-https://github.com/HoTT/coq/issues/54
-https://github.com/HoTT/coq/issues/55
- *)
-
-Definition path_sum {A B : Type} (z z' : A + B)
-           (pq : match z, z' with
-                   | inl z0, inl z'0 => z0 = z'0
-                   | inr z0, inr z'0 => z0 = z'0
-                   | _, _ => Empty
-                 end)
-: z = z'.
-  destruct z, z', pq; exact idpath.
-Defined.
-
-(* Why are A B etc in Set and not Type?  Some sort of universe polymorphism bug... *)
-Theorem ex2_8_raw {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B)
-              (* Fortunately, this unifies properly *)
-              (pq : match (x, y) with (inl x', inl y') => x' = y' | (inr x', inr y') => x' = y' | _ => Empty end) :
-  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
-  ap f (path_sum x y pq) = path_sum (f x) (f y)
-     (* Coq appears to require *ALL* of the annotations *)
-     ((match x as x return match (x, y) return Type with
-              (inl x', inl y') => x' = y'
-            | (inr x', inr y') => x' = y'
-            | _ => Empty
-          end -> match (f x, f y) return Type with
-               | (inl x', inl y') => x' = y'
-               | (inr x', inr y') => x' = y'
-               | _ => Empty end with
-           | inl x' => match y as y return match y return Type with
-                                               inl y' => x' = y'
-                                             | _ => Empty
-                                           end -> match f y return Type with
-                                                    | inl y' => g x' = y'
-                                                    | _ => Empty end with
-                         | inl y' => ap g
-                         | inr y' => idmap
-                       end
-           | inr x' => match y as y return match y return Type with
-                                               inr y' => x' = y'
-                                             | _ => Empty
-                                           end -> match f y return Type with
-                                                    | inr y' => h x' = y'
-                                                    | _ => Empty end with
-                         | inl y' => idmap
-                         | inr y' => ap h
-                       end
-       end) pq).
-     (* TRULY! Dependent pattern matching is terrifying! And this is the "good" version...
-     ((match (x, y) as (x, y) return
-          match (x, y) with
-              (inl x', inl y') => x' = y'
-            | (inr x', inr y') => x' = y'
-            | _ => Empty
-          end
-          -> match (f x, f y) with
-               | (inl x', inl y') => x' = y'
-               | (inr x', inr y') => x' = y'
-               | _ => Empty end
-       with
-           (inl x', inl y') => fun p => ap g p
-         | (inr x', inr y') => fun q => ap h q
-         | _ => fun b => b
-       end) pq). *)
-  destruct x; destruct y;
-  try solve [destruct pq]; path_induction; reflexivity.
-Qed.
-
-
-
-(* applying the jgross trick to figure out the type... *)
-Lemma ex2_8_code_sub (A B A' B' : Type) (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) : Type.
-  refine (let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in _).
-  refine (ap f (path_sum x y pq) = path_sum (f x) (f y) _).
-  refine ((match x return code x y -> code (f x) (f y) with inl a0 => fun p =>  _ | inr b0 => fun p => _ end) pq).
-  refine (lencode (ap f (ldecode p))).
-  refine (rencode (ap f (rdecode p))).
-Defined.
-
-Theorem ex2_8_code {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
-  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
-  ap f (path_sum x y pq) = path_sum (f x) (f y)
-     ((match x return code x y -> code (f x) (f y) with
-          inl a0 => fun p => lencode (ap f (ldecode p))
-        | inr b0 => fun p => rencode (ap f (rdecode p))
-      end) pq).
-  destruct x; destruct y; unfold code, lcode, rcode in *;
-  try solve [destruct pq]; path_induction; reflexivity.
-Qed.
-
-Theorem ex2_8_code' {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
-  let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
-  ap f (path_sum x y pq) = path_sum (f x) (f y) (encode (ap f (decode pq))).
-  destruct x; destruct y; unfold code, lcode, rcode, encode, decode in *;
-  try solve [destruct pq]; path_induction; reflexivity.
-Qed.
+(* The statement of functoriality ap, then, says what the action of ap
+is on elements of the /code/. (In the case of products, that was just the pair of equalities.) *)
 
 Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq : code x y) :
   let f z := match z with inl z' => inl (g z') | inr z' => inr (h z') end in
@@ -422,9 +355,30 @@ Theorem ex2_8 {A B A' B' : Type} (g : A -> A') (h : B -> B') (x y : A + B) (pq :
   try solve [destruct pq]; path_induction; reflexivity.
 Qed.
 
-(* "Application to Paths" from Harper notes https://www.dropbox.com/sh/jwtpx1rzal7um28/sOgTLhW1Zu/cancellation.pdf *)
+(* Harper describes a rather interesting alternate method for proving functoriality, which
+I tried developing here, but gave up midway.
+Definition apf_inv {A B} (f : A -> B) {eq : IsEquiv f} {a a' : A} : f a = f a' -> a = a' :=
+  fun q => ((eissect f a) ^ @ ap (f ^-1)%equiv q @ (eissect f a'))%path.
+Definition apf_alpha {A B} {f : A -> B} {eq : IsEquiv f} {a a' : A} (p : a = a') : apf_inv f (ap f p) = p.
+  path_induction. unfold apf_inv; simpl.
+  refine (concat (ap (fun p => (p @ eissect f a)%path) (concat_p1 _)) _).
+  apply concat_Vp.
+Defined.
+Definition apf_beta {A B} {f : A -> B} {eq : IsEquiv f} {a a' : A} (q : f a = f a') : ap f (apf_inv f q) = q.
+  (* Notice path_induction doesn't do anything *)
+  (* Discover the correct path *)
+  unfold apf_inv.
+  refine ((concat_p1 _) ^ @ _)%path.
+  assert (p : a = a').
+    refine ((eissect f a) ^ @ _)%path.
+    refine ((ap (f ^-1)%equiv q) @ _)%path.
+    exact ((eissect f a')).
+  unfold apf_inv.
+  path_induction.
+  
 
-
+Theorem apf_eq {A B} {f : A -> B} {eq : IsEquiv f} {x y : A}: IsEquiv (@ap _ _ f x y).
+  *)
 
 (* Exercise 2.9 *)
 
@@ -471,9 +425,140 @@ Qed.
  
 (* Exercise 2.11 *)
 
+(* To show that something is the corner of a pullback square, we just need to
+show the desired equivalence. *)
 
+Require Import ObjectClassifier.
+Print pullback.
+
+Definition pullback1 {A B C} (f : A -> C) (g : B -> C) (p : pullback f g) : A := p.1.
+Definition pullback2 {A B C} (f : A -> C) (g : B -> C) (p : pullback f g) : B := p.2.1.
+
+(* Stating the definitions of pullf and pullf_inv using apD10 is *critical*;
+ we will be doing reasoning with the fact that apD10 is an equivalence, and
+ if some of the parts of the definition are unfolded it will greatly obscure
+ what is going on. *)
+Definition pullf {A B C} X `{Funext} (f : A -> C) (g : B -> C) (h : X -> pullback f g) : pullback (@compose X _ _ f) (@compose X _ _ g).
+  refine (pullback1 f g o h; _).
+  refine (pullback2 f g o h; _).
+  apply path_forall; intro.
+  exact (h x).2.2.
+Defined.
+Definition pullf_inv {A B C} X (f : A -> C) (g : B -> C) (z : pullback (@compose X _ _ f) (@compose X _ _ g)) (x : X) : pullback f g.
+  refine (z.1 x; (z.2.1 x; _)).
+  exact (apD10 z.2.2 x).
+Defined.
+
+Theorem ex2_11 `{Funext} {A B C X} {f : A -> C} {g : B -> C} : IsEquiv (pullf X f g).
+  refine (isequiv_adjointify _ (pullf_inv X f g) _ _).
+
+  unfold Sect, pullf_inv, pullf, path_forall; simpl. destruct 0 as [f' [g' p]]; simpl. f_ap. f_ap.
+  apply ((ap apD10)^-1)%equiv.
+  apply (eisretr apD10).
+
+  unfold Sect, pullf_inv, pullf, path_forall; intro h; simpl.
+  apply path_forall; intro x.
+  repeat (apply path_sigma_uncurried; exists idpath; simpl).
+  change (h x).2.2 with ((fun x' => (h x').2.2) x); f_ap. (* because higher-order unification is undecidable *)
+  apply eisretr.
+Qed.
 
 (* Exercise 2.12 *)
+
+(* In the previous exercise we specialized (since h = .1 and k = .2.1), but for this exercise P is
+generic so it will be good to properly define pullback squares and the induced map in full
+generality. *)
+
+Print pullf.
+
+(* P -> A
+  4↓ 3  ↓1
+   B -> C
+     2    *)
+Definition induced_map `{Funext} {P A B C} (f : A -> C) (g : B -> C) (h : P -> A) (k : P -> B) (p : f o h = g o k) X (i : X -> P) : pullback (@compose X _ _ f) (@compose X _ _ g).
+  refine (h o i; (k o i; _)).
+  change (f o h o i = g o k o i).
+  refine (apD10 _ i).
+  exact (ap compose p).
+Defined.
+(* BTW, why couldn't pullf be defined in the same, graceful manner?  Well,
+the trouble is while the p here is explicitly provided, in the pullback case
+we got it out of the fact that pullbacks come with equality proofs.  We could
+have factored this out, so that the call-site of pullf was responsible
+for the extraction, but doing it the other way seemed more natural. It's a
+sleight of hand that reduces the arguments you need to pass around. (In
+a sense, we embedded the proof that it is a commutative square). *)
+
+Definition pullback_square `{Funext} {P A B C}
+                           (f : A -> C) (g : B -> C) (h : P -> A) (k : P -> B)
+                           (p : f o h = g o k) := 
+  forall X, IsEquiv (induced_map f g h k p X).
+
+(* The squares reproduced for your convenience:
+  A -> C -> E
+  ↓ p  ↓ q  ↓
+  B -> D -> F 
+    \--r--/  *)
+
+(* XXX I don't actually know if this is called whiskering *)
+Definition whisker
+          {A B C D E F} 
+          {ac : A -> C}
+          {ab : A -> B}
+          {cd : C -> D}
+          {bd : B -> D}
+          {ce : C -> E}
+          {ef : E -> F}
+          {df : D -> F}
+          (p : cd o ac = bd o ab)
+          (q : ef o ce = df o cd)
+  : ef o ce o ac = df o bd o ab.
+transitivity (df o cd o ac); [f_ap|].
+change (df o (cd o ac) = df o (bd o ab)); f_ap.
+Defined.
+
+Definition induced_map_inv1
+          `{Funext}
+          {A B C D E F X}
+          (ac : A -> C)
+          (ab : A -> B)
+          (cd : C -> D)
+          (bd : B -> D)
+          (ce : C -> E)
+          (ef : E -> F)
+          (df : D -> F)
+          (p : cd o ac = bd o ab)
+          (q : ef o ce = df o cd)
+          (P : pullback_square ef df ce cd q)
+          (S : pullback_square cd bd ac ab p)
+          (z : pullback (@compose X _ _ ef) (@compose X _ _ (df o bd)))
+          : X -> A.
+apply (S X).
+assert (xc : X -> C).
+  apply (P X); refine (z.1; (bd o z.2.1 ; z.2.2)).
+refine (xc ; (z.2.1 ;_)).
+  destruct z as [xe [xb r]]; simpl.
+
+Admitted.
+
+Theorem ex2_12
+          `{Funext}
+          {A B C D E F}
+          (ac : A -> C)
+          (ab : A -> B)
+          (cd : C -> D)
+          (bd : B -> D)
+          (ce : C -> E)
+          (ef : E -> F)
+          (df : D -> F)
+          (p : cd o ac = bd o ab)
+          (q : ef o ce = df o cd)
+          (P : pullback_square ef df ce cd q)
+  : (pullback_square cd bd ac ab p <-> pullback_square ef (df o bd) (ce o ac) ab (whisker p q)).
+constructor; intro S; intro X.  refine (isequiv_adjointify _ (induced_map_inv1 ac ab cd bd ce ef df p q P S) _ _).
+
+
+Qed.
 
 (* Exercise 2.13 *)
 
