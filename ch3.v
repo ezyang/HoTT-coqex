@@ -230,11 +230,21 @@ Corollary thm3_2_7 `{Univalence} `{Funext} : ~ (forall A, A + ~A).
   destruct (g A). trivial. contradiction (u n).
 Qed.
 
-Theorem ex3_11 `{Univalence} `{Funext} `{LEM} : ~ (forall A, Squash A -> A).
+(* This is a copy-paste of Theorem 3.2.2, but with ~~ replaced with Squash and relevant proof terms adjusted *)
+Theorem ex3_11 `{Univalence} `{Funext} : ~ (forall A, Squash A -> A).
   intro f.
-  refine (thm3_2_2 (fun A => _)).
-  intro u.
-Abort. (* I seem to want LEM and ex3_14 here, but we can only validly assume LEM on As that are HProp. *)
+  pose proof (fun u => apD10 (apD f (path_universe thm3_2_2_e)) u) as h.
+  pose proof (fun u => @transport_arrow _ (fun A => Squash A) (fun A => A) _ _ (path_universe thm3_2_2_e) (f Bool) u) as g.
+  assert (forall (u v : Squash Bool), u = v) as eq.
+    intros. pose proof (istrunc_truncation minus_one Bool) as X. apply X.
+  assert (forall (u : Squash Bool), transport (fun A => Squash A) (path_universe thm3_2_2_e)^ u = u) as i.
+    intros; apply eq.
+  pose proof (fun u => (h u)^ @ g u @ ap (fun z => transport idmap (path_universe thm3_2_2_e) (f Bool z)) (i u)) as j.
+  pose proof (fun u => j u @ transport_path_universe thm3_2_2_e (f Bool u)) as k.
+  assert (forall x : Bool, ~(thm3_2_2_e x = x)) as X.
+    destruct x; unfold thm3_2_2_e; simpl. apply false_ne_true. apply true_ne_false.
+  apply (X (f Bool (truncation_incl true)) (k (truncation_incl true))^).
+Qed.
 
 (* Exercise 3.12 *)
 
