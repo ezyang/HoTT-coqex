@@ -93,9 +93,34 @@ Theorem ex3_3 : forall A B, IsHSet A -> (forall x : A, IsHSet (B x)) -> IsHSet (
   assert (p..1 = q..1) as sa by apply h.
   assert (path_sigma_uncurried _ _ _ (p..1; p..2) = path_sigma_uncurried _ _ _ (q..1; q..2)) as c.
     f_ap. (* f_ap seems to not know to do path_sigma_uncurried *)
-    apply path_sigma_uncurried. exists sa. apply g.
+    apply path_sigma_uncurried. exists sa. apply g. (* NB: we don't have to worry about transport! Try simpl *)
   exact (a^ @ c @ b).
 Qed.
+
+(* XXX Despite its simplicity, I think this exercise is quite hard (much like exercise 2.7),
+because the added dependence makes many plausible approaches not work.  Here are some
+approaches that no longer work:
+
+ * 'p..2 = q..2' does not typecheck (the direct approach). More generally, things
+   which you would like to have the same type don't, and inserting transports yourself
+   don't seem to help things (similarly, consider eta_path_sigma)
+ * You cannot 'destruct' the term 'sa : p..1 = q..2' on account of dependence (the "oh
+   let's try path induction willy-nilly)
+ * Using the curried path_sigma function means you cannot apply f_ap to take
+   advantage of the structure of the path space revealed by path_sigma (the "surely
+   the shorter name is better crowd")
+
+The key insight of this problem is that the path space of a sigma type... is a sigma
+type itself, which is witnessed by the equivalence path_sigma_uncurried (note the
+uncurried: the sigma does NOT show up when things are curried; it's an implicit phenomenon
+due to dependence in that case). So if we need to analyze a complicated path like
+p = q, we turn it into a path of sigma types, and then use standard techniques (path_sigma
+/again/) to finally crack it.
+
+I suspect the lessons learned here also may provide some clues for how to improve f_ap
+further, in the face of dependence and multiple arguments (model them as sigmas!)
+
+*)
 
 Theorem ex3_3_library : forall A B, IsHSet A -> (forall x : A, IsHSet (B x)) -> IsHSet (sigT B).
   typeclasses eauto.
