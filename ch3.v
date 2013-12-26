@@ -22,25 +22,25 @@ Theorem ex3_1 : forall A B, Equiv A B -> IsHSet A -> IsHSet B.
   (* Intuitively, the proof uses the equivalence to ferry an appropriate equality
      from the known set to the unknown set.  Of course, the details are a little touchy. *)
 
-  assert (forall p' q' : f^-1 x = f^-1 y, (ap f^-1)^-1 p' = (ap f^-1)^-1 q') as H.
-    intros; repeat f_ap; apply h.
+  assert (forall p' q' : f^-1 x = f^-1 y, (ap f^-1)^-1 p' = (ap f^-1)^-1 q') as H by
+    (intros; repeat f_ap; apply h).
 
-  assert ((ap f^-1)^-1 (ap f^-1 p) = p) as r. apply eissect.
-  assert ((ap f^-1)^-1 (ap f^-1 q) = q) as s. apply eissect.
-  refine (r^ @ H _ _ @ s).
+  assert ((ap f^-1)^-1 (ap f^-1 p) = p) as r by apply eissect.
+  assert ((ap f^-1)^-1 (ap f^-1 q) = q) as s by apply eissect.
+  exact (r^ @ H _ _ @ s).
 Qed.
 
 (* A generalized version of this statement is proved in the library. *)
 Theorem ex3_1_library : forall A B, Equiv A B -> IsHSet A -> IsHSet B.
-  intros A B e h. apply (trunc_equiv (equiv_fun _ _ e)).
+  intros A B e h.
+  exact (trunc_equiv (equiv_fun _ _ e)).
 Qed.
 
 (* Here is a different proof that utilizes univalence.  Because it requires
    an axiom, it might be considered an inferior proof, but it is quite simple! *)
 Theorem ex3_1_ua `{Univalence} : forall A B, Equiv A B -> IsHSet A -> IsHSet B.
   intros A B eq h.
-  assert (A = B) as p. apply equiv_path_universe; trivial.
-  apply (transport IsHSet p); trivial.
+  exact (transport IsHSet (equiv_path_universe _ _ eq) h).
 Qed.
 
 (* Exercise 3.2 *)
@@ -58,7 +58,8 @@ Theorem ex3_2 : forall A B, IsHSet A -> IsHSet B -> IsHSet (A + B).
     pose proof ((path_sum x y)^-1 p). (* just a little trick to make contradiction work *)
     destruct x; destruct y; try apply g; try apply h; try contradiction.
 
-  (* XXX I think there should be some lemma which makes this work *)
+  (* XXX I think there should be some lemma for this bit, since we did the
+     same pattern for exercise 3.1 *)
   assert (path_sum x y ((path_sum x y)^-1 p) = p) as s by apply eisretr.
   assert (path_sum x y ((path_sum x y)^-1 q) = q) as r by apply eisretr.
   exact (s^ @ ap (path_sum x y) H @ r).
@@ -71,23 +72,30 @@ Theorem ex3_2_library : forall A B, IsHSet A -> IsHSet B -> IsHSet (A + B).
   typeclasses eauto.
 Qed.
 
-Goal forall A B, IsHSet A -> IsHSet B -> IsHSet (A * B).
+(* Exercise 3.3 *)
+
+(* Warmup: *)
+Example thm3_1_5 : forall A B, IsHSet A -> IsHSet B -> IsHSet (A * B).
   intros A B h g.
   intros x y; apply hprop_allpath; intros p q.
-  assert (ap fst p = ap fst q) by apply h.
-  assert (ap snd p = ap snd q) by apply g.
-  assert ((ap fst p, ap snd p) = (ap fst q, ap snd q)) by f_ap.
-  (* apply (path_prod_uncurried^-1 X1).
-  pose proof (eta_path_prod X X0).
-  Check @eta_path_prod. *)
-Abort.
+  assert (path_prod _ _ (ap fst p) (ap snd p) = p) as a by apply eta_path_prod.
+  assert (path_prod _ _ (ap fst q) (ap snd q) = q) as b by apply eta_path_prod.
+  assert (path_prod _ _ (ap fst p) (ap snd p) = path_prod _ _ (ap fst q) (ap snd q)) as c.
+    f_ap. apply h. apply g.
+  exact (a^ @ c @ b).
+Qed.
 
-(* Exercise 3.3 *)
 Theorem ex3_3 : forall A B, IsHSet A -> (forall x : A, IsHSet (B x)) -> IsHSet (sigT B).
   intros A B h g.
   intros x y; apply hprop_allpath; intros p q.
-  assert (p..1 = q..1) as s by apply h.
-Abort.
+  assert (path_sigma_uncurried _ _ _ (p..1; p..2) = p) as a by apply eta_path_sigma_uncurried.
+  assert (path_sigma_uncurried _ _ _ (q..1; q..2) = q) as b by apply eta_path_sigma_uncurried.
+  assert (p..1 = q..1) as sa by apply h.
+  assert (path_sigma_uncurried _ _ _ (p..1; p..2) = path_sigma_uncurried _ _ _ (q..1; q..2)) as c.
+    f_ap. (* f_ap seems to not know to do path_sigma_uncurried *)
+    apply path_sigma_uncurried. exists sa. apply g.
+  exact (a^ @ c @ b).
+Qed.
 
 Theorem ex3_3_library : forall A B, IsHSet A -> (forall x : A, IsHSet (B x)) -> IsHSet (sigT B).
   typeclasses eauto.
