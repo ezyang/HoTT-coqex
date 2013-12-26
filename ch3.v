@@ -119,7 +119,11 @@ Definition ex3_5_inverse A (g : A -> Contr A) := hprop_allpath A (fun x y => let
 Definition ex3_5_inverse' A (g : A -> Contr A) := fun x y => let H := g x in contr_paths_contr x y.
 
 Theorem ex3_5 `{Funext} : forall A, Equiv (IsHProp A) (A -> Contr A).
-Abort.
+  intro A.
+  apply (equiv_adjointify (ex3_5_f A) (ex3_5_inverse A)); unfold Sect, ex3_5_f, ex3_5_inverse.
+  intro f. apply path_forall. intro x. assert (IsHProp (Contr_internal A)) as X by typeclasses eauto. apply X.
+  intro h. assert (IsHProp (IsHProp A)) as X by typeclasses eauto. apply X.
+Qed.
 
 Theorem ex3_5_library `{Funext} : forall A, Equiv (IsHProp A) (A -> Contr A).
   intros; apply equiv_hprop_inhabited_contr.
@@ -251,12 +255,15 @@ the following sense: *)
 Theorem thm3_2_2' `{Univalence} `{Funext} : ~ (forall A, ~~A -> A).
   intro f.
   refine (ex3_11 (fun A => _)). intro sa. apply f.
-  refine (Truncation_rect_nondep (fun a => (fun p => p a)) sa).
+  refine (Truncation_rect_nondep (fun a p => p a) sa).
 Qed.
+(* NB: typeclasses automatically resolved the proof that ~~A is an HProp *)
 (* We will consider how to go the other direction in a later exercise. *)
 
 (* jgross suggests an alternate proof uses HITs (observing that the circle
-   is connected (squash) but not contractible (not squashed)) *)
+   is connected (squash) but not contractible (not squashed)). The basic idea
+   is the same: here, we use univalence to construct a nontrivial path space,
+   in the alternate proof, the circle provides the nontrivial path space. *)
 
 (* Exercise 3.12 *)
 
