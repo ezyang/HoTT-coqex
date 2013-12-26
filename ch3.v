@@ -246,7 +246,14 @@ Theorem ex3_11 `{Univalence} `{Funext} : ~ (forall A, Squash A -> A).
   apply (X (f Bool (truncation_incl true)) (k (truncation_incl true))^).
 Qed.
 
-(* XXX: So, why couldn't I just directly use Theorem 3.2.2 to prove this? *)
+(* The result of this exercise is a generalization of Theorem 3.2.2, in
+the following sense: *)
+Theorem thm3_2_2' `{Univalence} `{Funext} : ~ (forall A, ~~A -> A).
+  intro f.
+  refine (ex3_11 (fun A => _)). intro sa. apply f.
+  refine (Truncation_rect_nondep (fun a => (fun p => p a)) sa).
+Qed.
+(* We will consider how to go the other direction in a later exercise. *)
 
 (* jgross suggests an alternate proof uses HITs (observing that the circle
    is connected (squash) but not contractible (not squashed)) *)
