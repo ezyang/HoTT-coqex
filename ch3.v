@@ -246,6 +246,11 @@ Theorem ex3_11 `{Univalence} `{Funext} : ~ (forall A, Squash A -> A).
   apply (X (f Bool (truncation_incl true)) (k (truncation_incl true))^).
 Qed.
 
+(* XXX: So, why couldn't I just directly use Theorem 3.2.2 to prove this? *)
+
+(* jgross suggests an alternate proof uses HITs (observing that the circle
+   is connected (squash) but not contractible (not squashed)) *)
+
 (* Exercise 3.12 *)
 
 Theorem ex3_12 `{LEM} : forall A, Squash (Squash A -> A).
