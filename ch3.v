@@ -22,12 +22,8 @@ Theorem ex3_1 : forall A B, Equiv A B -> IsHSet A -> IsHSet B.
   (* Intuitively, the proof uses the equivalence to ferry an appropriate equality
      from the known set to the unknown set.  Of course, the details are a little touchy. *)
 
-  assert (forall p' q' : f^-1 x = f^-1 y, (ap f^-1)^-1 p' = (ap f^-1)^-1 q') as H by
-    (intros; repeat f_ap; apply h).
-
-  assert ((ap f^-1)^-1 (ap f^-1 p) = p) as r by apply eissect.
-  assert ((ap f^-1)^-1 (ap f^-1 q) = q) as s by apply eissect.
-  exact (r^ @ H _ _ @ s).
+  assert (ap f^-1 p = ap f^-1 q) as H by (apply h).
+  exact ((ap (ap f^-1))^-1 H).
 Qed.
 
 (* A generalized version of this statement is proved in the library. *)
@@ -58,11 +54,7 @@ Theorem ex3_2 : forall A B, IsHSet A -> IsHSet B -> IsHSet (A + B).
     pose proof ((path_sum x y)^-1 p). (* just a little trick to make contradiction work *)
     destruct x; destruct y; try apply g; try apply h; try contradiction.
 
-  (* XXX I think there should be some lemma for this bit, since we did the
-     same pattern for exercise 3.1 *)
-  assert (path_sum x y ((path_sum x y)^-1 p) = p) as s by apply eisretr.
-  assert (path_sum x y ((path_sum x y)^-1 q) = q) as r by apply eisretr.
-  exact (s^ @ ap (path_sum x y) H @ r).
+  exact ((ap (path_sum x y)^-1)^-1 H).
 Qed.
 
 (* The HoTT library has rather sophisticated type-class machinery for
