@@ -182,7 +182,7 @@ Definition qinv {A B} (f : A -> B) := {g : B -> A & ((f o g = idmap) * (g o f = 
 Definition squash_qinv `{Funext} {A B} (f : A -> B) : Squash (qinv f) -> IsEquiv f.
   assert (IsHProp (IsEquiv f)) as t by typeclasses eauto.
   intro sq.
-  Set Typeclasses Debug.
+(*  Set Typeclasses Debug. *)
 (*  refine (@Truncation_rect_nondep _ _ (IsEquiv f) _ (fun q => _) sq). *)
 (*  infinite loops?
 Debug: 1.1: exact t on (IsHProp (IsEquiv f))
