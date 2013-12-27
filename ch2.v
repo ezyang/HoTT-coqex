@@ -1,5 +1,6 @@
-
 Require Import HoTT.
+Local Open Scope path_scope.
+Local Open Scope equiv_scope.
 
 (* Exercise 2.1 *)
 
@@ -34,7 +35,7 @@ Defined.
 we need to compute to refl = refl. *)
 
 (* Exercise 2.2 *)
-Lemma eq_triangle {A : Type} {x y z : A} (p : x = y) (q : y = z) : (eq_lr_l p q @ eq_l_r p q)%path = eq_lr_r p q.
+Lemma eq_triangle {A : Type} {x y z : A} (p : x = y) (q : y = z) : eq_lr_l p q @ eq_l_r p q = eq_lr_r p q.
   induction p. induction q. reflexivity.
 Qed.
 
@@ -102,9 +103,9 @@ this is in fact that the equalities all work out.
 
 (* Exercise 2.5 *)
 Definition eq2_3_6 {A B x y} (f : A -> B) (p : x = y) : f x = f y -> transport (fun _ => B) p (f x) = f y :=
-  fun q => (transport_const _ _ @ q)%path.
+  fun q => transport_const _ _ @ q.
 Definition eq2_3_7 {A B x y} (f : A -> B) (p : x = y) : transport (fun _ => B) p (f x) = f y -> f x = f y :=
-  fun q => ((transport_const _ _) ^ @ q)%path. (* careful with associativity precedence *)
+  fun q => (transport_const _ _)^ @ q. (* careful with associativity precedence *)
 
 (* I don't know what an "inverse equivalence" is, but it seems like these ought to form an equivalence *)
 
@@ -237,7 +238,7 @@ Section 2.12 of the HoTT book, as well as the appropriate equivalences. *)
 Definition lcode {A B} (a0 : A) (x : A + B) :=
   match x return Type with inl a => a0 = a | inr b => Empty end.
 Definition lencode {A B} {a0 : A} {x : A + B} (p : inl a0 = x) : lcode a0 x :=
-  transport (lcode a0) p idpath.
+  transport (lcode a0) p 1.
 Definition ldecode {A B} {a0 : A} {x : A + B} (c : lcode a0 x) : inl a0 = x.
   destruct x. exact (ap inl c). destruct c.
 Defined.
@@ -255,7 +256,7 @@ Theorem thm2_12_15 {A B} (a0 : A) (x : A + B) : IsEquiv (@lencode A B a0 x).
 Qed.
 
 Definition rcode {A B} (b0 : B) (x : A + B) := match x return Type with inl a => Empty | inr b => b0 = b end.
-Definition rencode {A B} {b0 : B} {x : A + B} (p : inr b0 = x) : rcode b0 x := transport (rcode b0) p idpath.
+Definition rencode {A B} {b0 : B} {x : A + B} (p : inr b0 = x) : rcode b0 x := transport (rcode b0) p 1.
 Definition rdecode {A B} {b0 : B} {x : A + B} (c : rcode b0 x) : inr b0 = x.
   destruct x. destruct c. f_ap.
 Defined.
@@ -379,7 +380,6 @@ Definition apf_beta {A B} {f : A -> B} {eq : IsEquiv f} {a a' : A} (q : f a = f 
 
 Theorem apf_eq {A B} {f : A -> B} {eq : IsEquiv f} {x y : A}: IsEquiv (@ap _ _ f x y).
   *)
-
 (* Exercise 2.9 *)
 
 Definition sum_universal_iso {A B X : Type} (f : A + B -> X) : (A -> X) * (B -> X) := (fun a => f (inl a), fun b => f (inr b)).
@@ -391,7 +391,7 @@ Definition sum_universal_beta {A B X : Type} (hg : (A -> X) * (B -> X)) : sum_un
   unfold sum_universal_iso, sum_universal_osi. destruct hg; reflexivity.
 Defined.
 
-Definition sum_universal {A B X : Type} `{Funext} : Equiv ((A -> X) * (B -> X)) (A + B -> X).
+Definition sum_universal {A B X : Type} `{Funext} : (A -> X) * (B -> X) <~> (A + B -> X).
   apply (equiv_adjointify sum_universal_osi sum_universal_iso sum_universal_alpha sum_universal_beta).
 Defined.
 
@@ -418,7 +418,7 @@ Ltac simplHyp :=
 Ltac crush := simpl in *; repeat simplHyp; try trivial; try solve [f_ap].
 
 Definition sigma_assoc {A} {B : A -> Type} (C : sigT (fun x : A => B x) -> Type) :
-  Equiv (sigT (fun x : A => sigT (fun y : B x => C (x; y)))) (sigT (fun (p : sigT (fun x : A => B x)) => C p)).
+  sigT (fun x : A => sigT (fun y : B x => C (x; y))) <~> sigT (fun (p : sigT (fun x : A => B x)) => C p).
   refine (equiv_adjointify (@sigma_assoc_iso A B C) (@sigma_assoc_osi A B C) _ _);
   intro; unfold sigma_assoc_osi, sigma_assoc_iso; crush.
 Qed.
@@ -602,8 +602,7 @@ admit.
 
 refine (isequiv_adjointify _ (induced_map_inv2 ac ab cd bd ce ef df p q P S) _ _).
 intro z. unfold induced_map_inv2.
-
-Qed.
+Abort.
 
 (* Exercise 2.13 *)
 
@@ -620,4 +619,4 @@ Definition ex2_13_g : Bool -> Equiv Bool Bool.
 Abort.
 
 Lemma ex2_13 : Equiv (Equiv Bool Bool) Bool.
-  
+Abort.
