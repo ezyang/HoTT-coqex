@@ -213,11 +213,11 @@ Section ex_1_6.
 
   Definition myprod_ind (C : myprod A B -> Type)
                         (g : forall (x : A) (y : B), C (mymkprod x y)) (x : myprod A B) : C x :=
-    transport C (myprod_uppt x) (g (mypr1 x) (mypr2 x)).
+    myprod_uppt x # g (mypr1 x) (mypr2 x).
 
-  Lemma myprod_uppt_canonical : forall a b, myprod_uppt (mymkprod a b) = 1%path.
+  Lemma myprod_uppt_canonical : forall a b, myprod_uppt (mymkprod a b) = 1.
     intros; unfold myprod_uppt.
-    transitivity (path_forall (mymkprod (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b))) _ (fun _ => 1%path)).
+    transitivity (path_forall (mymkprod (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b))) _ (fun _ => 1)).
       f_ap; crush; by_extensionality x; destruct x; crush.
       apply path_forall_1. (* for some reason auto doesn't pick this up, maybe because of the axiom *)
   Qed.
@@ -226,25 +226,25 @@ Section ex_1_6.
   (* same as exercise 1.3! *)
   Goal forall C g a b, myprod_ind C g (mymkprod a b) = g a b.
     intros; unfold myprod_ind.
-    transitivity (transport C 1%path (g (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b)))); try f_ap; crush; auto.
+    transitivity (transport C 1 (g (mypr1 (mymkprod a b)) (mypr2 (mymkprod a b)))); try f_ap; crush; auto.
   Qed.
 End ex_1_6.
 
 (* Exercise 1.7 *)
 
-Definition ind {A : Type} : forall (C : forall (x y : A), x = y -> Type), (forall (x : A), C x x 1%path) -> forall (x y : A) (p : x = y), C x y p.
+Definition ind {A : Type} : forall (C : forall (x y : A), x = y -> Type), (forall (x : A), C x x 1) -> forall (x y : A) (p : x = y), C x y p.
   path_induction; crush. (* the easy direction *)
 Qed.
 
 (* these are the textbook definitions that uses universes: notice they have exactly the same structure! *)
 
 Definition ind'1 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p.
-  pose (D := fun x y p => forall (C : forall (z : A) (p : x = z), Type), C x 1%path -> C y p).
-  assert (d : forall x : A, D x x 1%path) by exact (fun x C (c : C x 1%path) => c). (* cannot pose this, for some reason *)
+  pose (D := fun x y p => forall (C : forall (z : A) (p : x = z), Type), C x 1 -> C y p).
+  assert (d : forall x : A, D x x 1) by exact (fun x C (c : C x 1) => c). (* cannot pose this, for some reason *)
   apply (ind D d); auto.
 Qed.
 Definition ind'2 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p :=
-  ind (fun x y p => forall (C : forall (z : A), x = z -> Type), C x 1%path -> C y p)
+  ind (fun x y p => forall (C : forall (z : A), x = z -> Type), C x 1 -> C y p)
       (fun x C d => d)
       a x p C c.
 
@@ -262,7 +262,7 @@ Definition ind' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 
    (* Contributed by jgross: use 'change' in order to convert the expressions into
       something we can do a normal transport over.  Fortunately, there is an
       obvious choice. *)
-   change ((fun xp => C xp.1 xp.2) (a; 1%path)) in c.
+   change ((fun xp => C xp.1 xp.2) (a; 1)) in c.
    change ((fun xp => C xp.1 xp.2) (x; p)).
    Check (@contr _ (contr_basedpaths a) (x; p)).
    apply (transport _ (@contr _ (contr_basedpaths a) (x; p))); crush.
@@ -352,9 +352,9 @@ Goal forall P, ~~(P \/ ~P). unfold not; auto. Qed.
 
 (* Exercise 1.14 *)
 
-Definition f : forall (A : Type) (x : A) (p : x = x), p = idpath.
+Definition f : forall (A : Type) (x : A) (p : x = x), p = 1.
   intros. path_induction.
-  try (exact idpath).
+  try (exact 1).
 Abort.
 
 (* The problem is both endpoints are fixed. There are nontrivial homotopies now! *)
@@ -369,4 +369,4 @@ Qed.
 Notice that the normal path induction proof is pretty similar to the based path induction proof. *)
 
 Definition ioi {A : Type} (C : A -> Type) (x y : A) (p : x = y) : C x -> C y :=
-  fun c => ind (fun _ _ _ => C y) (fun _ => transport C p c) x y p.
+  fun c => ind (fun _ _ _ => C y) (fun _ => p # c) x y p.
