@@ -179,6 +179,24 @@ Notation Squash A := (Truncation minus_one A).
 
 Definition qinv {A B} (f : A -> B) := {g : B -> A & ((f o g = idmap) * (g o f = idmap))}.
 
+Definition squash_qinv `{Funext} {A B} (f : A -> B) : Squash (qinv f) -> IsEquiv f.
+  assert (IsHProp (IsEquiv f)) as t by typeclasses eauto.
+  intro sq.
+  Set Typeclasses Debug.
+(*  refine (@Truncation_rect_nondep _ _ (IsEquiv f) _ (fun q => _) sq). *)
+(*  infinite loops?
+Debug: 1.1: exact t on (IsHProp (IsEquiv f))
+Debug: 1.1: eapply cancelL_isequiv on (IsEquiv f)
+Debug: 1.1.1.1: apply isequiv_path on (IsEquiv ?1060)
+Debug: 1.1.2.1: apply @isequiv_compose on
+(IsEquiv (transport idmap ?1065 o f))
+Debug: 1.1.2.1.1.1: eapply cancelL_isequiv on (IsEquiv f)
+Debug: 1.1.2.1.1.1.1.1: apply isequiv_path on (IsEquiv ?1107)
+Debug: 1.1.2.1.1.1.2.1: apply @isequiv_compose on
+(IsEquiv (transport idmap ?1112 o f))
+*)
+Abort.
+
 (* Exercise 3.9 *)
 
 (* oops, HoTT library doesn't seem to have LEM, see https://github.com/HoTT/HoTT/issues/299 *)
@@ -199,7 +217,7 @@ Definition ex3_9_f `{LEM} : sigT IsHProp -> Bool.
   destruct (lem x.1 x.2).
   exact true.
   exact false.
-Defined.  
+Defined.
 
 Definition ex3_9_inverse : Bool -> sigT IsHProp.
   intro b.
