@@ -1,6 +1,47 @@
 Require Import HoTT.
 
-(* Use sparingly! *)
+(* By default, the HoTT library does not dump a bunch of notations in your
+   scope.  However, these notations are tremendously useful, so most users
+   of the HoTT library will want to open these two scopes, which introduce
+   notations for paths and for equivalences.  The Cliff's notes version of
+   these notations:
+
+Notation "1" := idpath : path_scope.
+Notation "p @ q" := (concat p q) (at level 20) : path_scope.
+Notation "p ^" := (inverse p) (at level 3) : path_scope.
+Notation "p # x" := (transport _ p x) (right associativity, at level 65) : path_scope.
+
+Notation "A <~> B" := (Equiv A B) (at level 85) : equiv_scope.
+Notation "f ^-1" := (@equiv_inv _ _ f _) (at level 3) : equiv_scope.
+
+NB: ^ and ^-1 bind quite tightly, so it's not uncommon to see terms like 'f^-1 a'
+or '(f a)^-1'.
+*)
+Local Open Scope path_scope.
+Local Open Scope equiv_scope.
+
+(* There are also a number of other notations which /are/ enabled by default. The
+most important ones are these:
+
+Notation idmap := (fun x => x).
+Notation "( x ; y )" := (existT _ x y) : fibration_scope.
+Notation "x .1" := (projT1 x) (at level 3) : fibration_scope.
+Notation "x .2" := (projT2 x) (at level 3) : fibration_scope.
+Notation "g 'o' f" := (compose g f) (at level 40, left associativity) : function_scope.
+Notation "x = y :> A" := (@paths A x y) : type_scope.
+Notation "x = y" := (x = y :>_) : type_scope.
+Notation "f == g" := (pointwise_paths f g) (at level 70, no associativity) : type_scope.
+Notation "p ..1" := (projT1_path p) (at level 3) : fibration_scope.
+Notation "p ..2" := (projT2_path p) (at level 3) : fibration_scope.
+
+NB: When writing code using the projT* notations, the space is usually omitted,
+as in 'x.1' or 'p..2'. Coq will format it with a space, however.
+ *)
+
+(* The first chapter includes some exercises that might be seen in a traditional
+   introduction to Coq.  There are many ways to go about solving these problems,
+   but I've opted to approximate theorem-proving in the Chlipala style, as seen
+   in CPDT, which emphasizes proof automation. *)
 Ltac rewriter := 
   autorewrite with core;
   repeat (match goal with
@@ -10,10 +51,7 @@ Ltac simplHyp :=
   match goal with
       | [ H : _ * _ |- _ ] => destruct H (* half-assed, can be generalized for any inversion *)
   end.
-
 Ltac crush := simpl in *; repeat simplHyp; try trivial; try solve [f_ap].
-
-Definition refl {A : Type} (x : A) : x = x := 1%path.
 
 (* If you want to use concat, you will usually need to use eauto, since the
 path concat passes through is UNSPECIFIED. *)
@@ -23,15 +61,24 @@ Hint Constructors prod.
 (* Exercise 1.1 *)
 Definition mycompose {A B C : Type} (g : B -> C) (f : A -> B) : A -> C :=
   fun x => g (f x).
-Goal forall (A B C D : Type) (f : A -> B) (g : B -> C) (h : C -> D),
+Theorem mycompose_assoc : forall (A B C D : Type) (f : A -> B) (g : B -> C) (h : C -> D),
        mycompose h (mycompose g f) = mycompose (mycompose h g) f.
   reflexivity.
 Qed.
-
-(* Alternately: intros; cbv delta beta; reflexivity *)
+(* Or you can do it after applying evaluation rules yourself. *)
+Theorem mycompose_assoc' : forall (A B C D : Type) (f : A -> B) (g : B -> C) (h : C -> D),
+       mycompose h (mycompose g f) = mycompose (mycompose h g) f.
+   intros. cbv delta beta. reflexivity.
+Qed.
+(* Remark: the fact that this is trivially true in a proof assistant
+   is actually somewhat remarkable: it means that if you are able to
+   formulate an operation as a function application, you get associativity
+   for free.  It's worth contrasting this with the usual definition of
+   addition on natural numbers, where associativity only holds *propositionally*. *)
+Definition mycompose_library {A B C} := @compose A B C.
 
 (* Exercise 1.2 *)
-Section ex_1_2_prod.
+Section Book_1_2_prod.
   Variable A B : Type.
   Check @fst.
   Check @snd.
@@ -39,9 +86,9 @@ Section ex_1_2_prod.
     g (fst p) (snd p).
   Goal fst = my_prod_rec A (fun a => fun b => a). reflexivity. Qed.
   Goal snd = my_prod_rec B (fun a => fun b => b). reflexivity. Qed.
-End ex_1_2_prod.
+End Book_1_2_prod.
 
-Section ex_1_2_sig.
+Section Book_1_2_sig.
   Variable A : Type.
   Variable B : A -> Type.
   Check @projT1.
@@ -50,28 +97,30 @@ Section ex_1_2_sig.
     g (projT1 p) (projT2 p).
   Goal @projT1 A B = my_sig_rec A (fun a => fun b => a). reflexivity. Qed.
   (* recall it's not possible to implement projT2 with the recursor! *)
-End ex_1_2_sig.
+End Book_1_2_sig.
 
 (* Exercise 1.3 *)
 
-Section ex_1_3_prod.
+Section Book_1_3_prod.
   Variable A B : Type.
-  Definition uppt : forall (x : A * B), ((fst x, snd x) = x) :=
-    fun p => match p with (a,b) => refl (a,b) end.
-  Definition my_prod_ind (C : A * B -> Type) (g : forall (x : A) (y : B), C (x, y)) (x : A * B) : C x :=
-    transport C (uppt x) (g (fst x) (snd x)).
-  Goal forall C g a b, my_prod_ind C g (a, b) = g a b. reflexivity. Qed.
-End ex_1_3_prod.
+  Definition prod_uppt : forall (x : A * B), ((fst x, snd x) = x) :=
+    fun p => match p with (a,b) => 1 end.
+  Definition prod_ind_uppt (C : A * B -> Type) (g : forall (x : A) (y : B), C (x, y)) (x : A * B) : C x :=
+    transport C (prod_uppt x) (g (fst x) (snd x)).
+  Definition Book_1_3_prod := prod_ind_uppt.
+  Theorem Book_1_3_prod_refl : forall C g a b, prod_ind_uppt C g (a, b) = g a b. reflexivity. Qed.
+End Book_1_3_prod.
 
-Section ex_1_3_sig.
+Section Book_1_3_sig.
   Variable A : Type.
   Variable B : A -> Type.
   Definition sig_uppt : forall (x : exists (a : A), B a), ((projT1 x; projT2 x) = x) :=
-    fun p => match p with (a;b) => refl (a;b) end.
-  Definition mysig_ind (C : (exists (a : A), B a) -> Type) (g : forall (a : A) (b : B a), C (a; b)) (x : exists (a : A), B a) : C x :=
+    fun p => match p with (a;b) => 1 end.
+  Definition sig_ind_uppt (C : (exists (a : A), B a) -> Type) (g : forall (a : A) (b : B a), C (a; b)) (x : exists (a : A), B a) : C x :=
     transport C (sig_uppt x) (g (projT1 x) (projT2 x)).
-  Goal forall C g a b, mysig_ind C g (a; b) = g a b. reflexivity. Qed.
-End ex_1_3_sig.
+  Definition Book_1_3_sig := sig_ind_uppt.
+  Theorem Book_1_3_sig_refl : forall C g a b, sig_ind_uppt C g (a; b) = g a b. reflexivity. Qed.
+End Book_1_3_sig.
 
 (* Exercise 1.4 *)
 Fixpoint iter (C : Type) (c0 : C) (cs : C -> C) (n : nat) : C :=
@@ -189,12 +238,12 @@ Qed.
 
 (* these are the textbook definitions that uses universes: notice they have exactly the same structure! *)
 
-Definition ind'1 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p.
+Definition ind'1 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p.
   pose (D := fun x y p => forall (C : forall (z : A) (p : x = z), Type), C x 1%path -> C y p).
   assert (d : forall x : A, D x x 1%path) by exact (fun x C (c : C x 1%path) => c). (* cannot pose this, for some reason *)
   apply (ind D d); auto.
 Qed.
-Definition ind'2 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p :=
+Definition ind'2 {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p :=
   ind (fun x y p => forall (C : forall (z : A), x = z -> Type), C x 1%path -> C y p)
       (fun x C d => d)
       a x p C c.
@@ -208,7 +257,7 @@ Check @transport.
 Check @contr_basedpaths.
 Print Contr.
 
-Definition ind' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p.
+Definition ind' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p.
    refine (ind (fun _ _ _ => C x p) (fun _ => _) a x p).
    (* Contributed by jgross: use 'change' in order to convert the expressions into
       something we can do a normal transport over.  Fortunately, there is an
@@ -223,7 +272,7 @@ Print ind'.
 Unset Printing Universes.
 
 Check (fun (A : Type) (x a : A) (p : a = x) => contr (x; p)).
-Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a (refl a)) (x : A) (p : a = x) : C x p :=
+Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p :=
   ind (fun _ _ _ => C x p)
       (fun _ => transport (fun z : exists x, a = x => C z.1 z.2)
                           (contr (x; p)) c)
@@ -234,7 +283,7 @@ Check nat_rect.
 (* You can write these to ways, and it's traditional to recurse on the first argument *)
 Definition add (a b : nat) := nat_rect (fun _ => nat) b (fun _ n => S n) a.
 Definition mult (a b : nat) := nat_rect (fun _ => nat) 0 (fun _ n => add n b) a.
-Definition exp (a b : nat) := nat_rect (fun _ => nat) 1 (fun _ n => mult n b) a.
+Definition exp (a b : nat) := nat_rect (fun _ => nat) 1%nat (fun _ n => mult n b) a.
 Eval compute in mult 3 4.
 Eval compute in exp 2 4.
 
