@@ -11,9 +11,6 @@ Theorem ex3_1 : forall A B, Equiv A B -> IsHSet A -> IsHSet B.
   (* There is a very important fact to remember about ap and equivalences! You
      will have a hard time solving this question without remembering it. *)
   SearchAbout ap IsEquiv.
-  (* NB: pose proof says "Here is a proof term, stick it in the context."
-     It's often convenient, because you don't have to say what the type of the term is. *)
-  pose proof (@isequiv_ap B A f^-1 isequiv_inverse) as ap_equiv.
 
   (* Annoyingly enough, this seems to be the idiomatic way to construct
      an IsHSet. Just cargo-cult it. *)
