@@ -257,8 +257,10 @@ Check @transport.
 Check @contr_basedpaths.
 Print Contr.
 
+(* Of course, one should also properly show that transport and contr_basedpaths can be
+proved from ind.  *)
+
 Definition ind' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p.
-   refine (ind (fun _ _ _ => C x p) (fun _ => _) a x p).
    (* Contributed by jgross: use 'change' in order to convert the expressions into
       something we can do a normal transport over.  Fortunately, there is an
       obvious choice. *)
@@ -273,10 +275,8 @@ Unset Printing Universes.
 
 Check (fun (A : Type) (x a : A) (p : a = x) => contr (x; p)).
 Definition ind'' {A : Type} (a : A) (C : forall (x : A), a = x -> Type) (c : C a 1) (x : A) (p : a = x) : C x p :=
-  ind (fun _ _ _ => C x p)
-      (fun _ => transport (fun z : exists x, a = x => C z.1 z.2)
-                          (contr (x; p)) c)
-      a x p.
+  transport (fun z : exists x, a = x => C z.1 z.2)
+            (contr (x; p)) c.
 
 (* Exercise 1.8 *)
 Check nat_rect.
